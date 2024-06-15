@@ -138,16 +138,40 @@ class Parser:
         return Num(token)
 
     def factor(self, token):
-        self.eat(token.type)
-        if self.current_token.type == TokenType.RPAREN:
+        prev_token = token
+
+        if token.type == TokenType.LPAREN:
+            self.eat(token.type)
+
+        if prev_token.type == TokenType.LPAREN and self.current_token.type == TokenType.RPAREN:
             self.error()
+
         return self.expr()
+
+    def get_next_token_type(self):
+        pos = self.lexer.pos
+
+        if pos > len(self.lexer.text) - 1:
+            return TokenType.EOF
+
+        while (next_char := self.lexer.text[pos]).isspace():
+            pos += 1
+
+        if next_char == '*':
+            return TokenType.MUL
+        elif next_char == '/':
+            return TokenType.DIV
 
     def expr(self):
         """Парсер для арифметичних виразів."""
+
+        while self.current_token == TokenType.RPAREN:
+            self.eat(TokenType.RPAREN)
+
         if self.current_token.type == TokenType.LPAREN:
             node = self.factor(self.current_token)
-        else:
+
+        elif self.current_token.type == TokenType.INTEGER:
             node = self.term()
 
         while self.current_token.type in TokenType.expr_types():
@@ -162,16 +186,17 @@ class Parser:
                 self.eat(TokenType.DIV)
             elif token.type == TokenType.LPAREN:
                 node = self.factor(token)
-            elif token.type == TokenType.RPAREN:
-                self.eat(TokenType.RPAREN)
 
-                if self.current_token.type != TokenType.EOF:
-                    continue
-                else:
-                    return node
-
-            right = self.term() if self.current_token.type == TokenType.INTEGER else self.factor(self.current_token)
+            if token.type != TokenType.RPAREN and self.get_next_token_type() in (TokenType.MUL, TokenType.DIV):
+                right = self.factor(self.current_token)
+            else:
+                right = self.term() if self.current_token.type == TokenType.INTEGER else self.factor(self.current_token)
             node = BinOp(left=node, op=token, right=right)
+
+            if TokenType.RPAREN in (self.current_token.type, token.type):
+                self.eat(TokenType.RPAREN)
+                return node
+
         return node
 
 
@@ -238,3 +263,12 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+# Введіть вираз (або "exit" для виходу): 2 + 3 * 4
+# 14
+# Введіть вираз (або "exit" для виходу): (2 + 3) * 4
+# 20
+# Введіть вираз (або "exit" для виходу): (2 + 2) * (2 + 3)
+# 20
+# Введіть вираз (або "exit" для виходу): (2 + (3 - 1)) * 3
+# 12
