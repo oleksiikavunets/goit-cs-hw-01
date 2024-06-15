@@ -9,7 +9,7 @@ section .text
 _start:
     mov al, [b]
     sub al, [c]
-    add al, [b]
+    add al, [a]
 
     add al, 30h
 
@@ -24,3 +24,4 @@ _start:
     mov ax, 4c00h
     int 21h
 
+;b - c + a
