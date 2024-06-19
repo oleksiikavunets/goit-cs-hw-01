@@ -16,10 +16,6 @@ class TokenType:
     RPAREN = "RPAREN"
     EOF = "EOF"  # Означає кінець вхідного рядка
 
-    @classmethod
-    def expr_types(cls):
-        return cls.PLUS, cls.MINUS, cls.MUL, cls.DIV, cls.LPAREN, cls.RPAREN
-
 
 class Token:
     def __init__(self, type, value):
@@ -132,70 +128,47 @@ class Parser:
             self.error()
 
     def term(self):
-        """Парсер для 'term' правил граматики. У нашому випадку - це цілі числа."""
-        token = self.current_token
-        self.eat(TokenType.INTEGER)
-        return Num(token)
+        """Парсер для 'term' правил граматики. У нашому випадку - це цілі числа, множення та ділення."""
+        node = self.factor()
 
-    def factor(self, token):
-        prev_token = token
+        while self.current_token.type in (TokenType.MUL, TokenType.DIV):
+            token = self.current_token
+            if token.type == TokenType.MUL:
+                self.eat(TokenType.MUL)
+            elif token.type == TokenType.DIV:
+                self.eat(TokenType.DIV)
+            node = BinOp(left=node, op=token, right=self.factor())
+
+        return node
+
+    def factor(self):
+        token = self.current_token
+
+        if token.type == TokenType.INTEGER:
+            self.eat(TokenType.INTEGER)
+            return Num(token)
 
         if token.type == TokenType.LPAREN:
-            self.eat(token.type)
+            self.eat(TokenType.LPAREN)
+            node = self.expr()
+            self.eat(TokenType.RPAREN)
 
-        if prev_token.type == TokenType.LPAREN and self.current_token.type == TokenType.RPAREN:
+            return node
+        else:
             self.error()
-
-        return self.expr()
-
-    def get_next_token_type(self):
-        pos = self.lexer.pos
-
-        if pos > len(self.lexer.text) - 1:
-            return TokenType.EOF
-
-        while (next_char := self.lexer.text[pos]).isspace():
-            pos += 1
-
-        if next_char == '*':
-            return TokenType.MUL
-        elif next_char == '/':
-            return TokenType.DIV
 
     def expr(self):
         """Парсер для арифметичних виразів."""
+        node = self.term()
 
-        while self.current_token == TokenType.RPAREN:
-            self.eat(TokenType.RPAREN)
-
-        if self.current_token.type == TokenType.LPAREN:
-            node = self.factor(self.current_token)
-
-        elif self.current_token.type == TokenType.INTEGER:
-            node = self.term()
-
-        while self.current_token.type in TokenType.expr_types():
+        while self.current_token.type in (TokenType.PLUS, TokenType.MINUS):
             token = self.current_token
             if token.type == TokenType.PLUS:
                 self.eat(TokenType.PLUS)
             elif token.type == TokenType.MINUS:
                 self.eat(TokenType.MINUS)
-            elif token.type == TokenType.MUL:
-                self.eat(TokenType.MUL)
-            elif token.type == TokenType.DIV:
-                self.eat(TokenType.DIV)
-            elif token.type == TokenType.LPAREN:
-                node = self.factor(token)
 
-            if token.type != TokenType.RPAREN and self.get_next_token_type() in (TokenType.MUL, TokenType.DIV):
-                right = self.factor(self.current_token)
-            else:
-                right = self.term() if self.current_token.type == TokenType.INTEGER else self.factor(self.current_token)
-            node = BinOp(left=node, op=token, right=right)
-
-            if TokenType.RPAREN in (self.current_token.type, token.type):
-                self.eat(TokenType.RPAREN)
-                return node
+            node = BinOp(left=node, op=token, right=self.term())
 
         return node
 
